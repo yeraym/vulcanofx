@@ -1,0 +1,655 @@
+<html>
+<head>
+
+</head>
+
+<body>
+<h1>TILT EQ Calculator</h1>
+
+
+
+
+
+
+
+
+<div style="border: 1px solid black; padding: 1em;">
+	<form>
+		<h3>Desired filter response:</h3>
+		<p id="component_error" style="display: none;color: red;"></p>
+		<p>
+		<p>
+		pot value:&nbsp;<input class="positive" maxlength="6" id="Ipot_value1" size="10" type="text" value="50" />Kohm lin</p>
+		<p>
+		pivot frequency:&nbsp;<input class="positive" maxlength="14" id="Ipivot_frequency" size="14" type="text" value="897.7389962" />&nbsp;Hz</p>
+		<p>
+		bass boost:&nbsp;<input class="positive" maxlength="15" id="Ibass_boost" size="15" type="text" value="6.293477527" />db</p>
+		<p>
+		treble boost:&nbsp;<input class="positive" maxlength="15" id="Itreble_boost" size="15" type="text" value="6.442964425" />db</p>
+		<p>
+		<input id="bComponents" type="button" value="Calc" onClick="call_components();" /></p>
+		<h3>Components values needed:</h3>
+		RF = <span id="ORF">47</span> Kohm<br/>
+		R = <span id="OR">15</span> Kohm<br/>
+		C = <span id="OC">5.6</span> nF<br/>
+	</form>
+</div>
+
+<br/>
+
+<div style="border: 1px solid black; padding: 1em;">
+	<form>
+		<h3>Components values used:</h3>
+		<p id="filter_error" style="display: none;color: red;"></p>
+		<p>
+		pot value:&nbsp;<input class="positive" maxlength="6" id="Ipot_value2" size="10" type="text" value="50" />Kohm lin</p>
+		<p>
+		RF:&nbsp;<input class="positive" maxlength="6" id="IRF_K" size="6" type="text" value="47" />&nbsp;Kohm</p>
+		<p>
+		R:&nbsp;<input class="positive" maxlength="6" id="IR_K" size="6" type="text" value="15" />&nbsp;Kohm</p>
+		<p>
+		C:&nbsp;<input class="positive" maxlength="6" id="IC_NF" size="6" type="text" value="5.6" />&nbsp;nF</p>
+		<p>
+		<p>
+		<input id="bFilter" type="button" value="Calc" onClick="call_filter();" /></p>
+		<h3>Filter response:</h3>
+		pivot frequency = <span id="Opivot_frequency">897.74</span> Hz<br/>
+		bass boost = <span id="Obass_boost">6.29</span> db<br/>
+		treble boost = <span id="Otreble_boost">6.44</span> db<br/>
+	
+		<br/>
+		<h3>Plot</h3>
+		<div id="plot2" style="height: 600px;  width: 800px;  "></div>
+	</form>
+</div>
+
+
+
+
+
+
+
+
+
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jqPlot/1.0.8/jquery.jqplot.min.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jqPlot/1.0.8/plugins/jqplot.dateAxisRenderer.min.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jqPlot/1.0.8/plugins/jqplot.logAxisRenderer.min.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jqPlot/1.0.8/plugins/jqplot.canvasTextRenderer.min.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jqPlot/1.0.8/plugins/jqplot.canvasAxisTickRenderer.min.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jqPlot/1.0.8/plugins/jqplot.highlighter.min.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/1.7.0/math.min.js"></script>
+<link rel="stylesheet" type="text/css" hrf="https://cdnjs.cloudflare.com/ajax/libs/jqPlot/1.0.8/jquery.jqplot.min.css" />
+<link rel="stylesheet" type="text/css" hrf="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.11.4/jquery-ui.css" />	
+
+<script type="text/javascript">
+
+function getSeries(){
+    var series = [];
+    var scope = getScope();
+    
+    var step = scope.P1/10;
+    for(var i=0; i<=scope.P1;i+=step) {
+        scope.X = i;
+        series.push(getSerie(scope));
+    }
+    return series;
+}
+
+function getScope() {
+    var RF_K = $("#IRF_K").val(); // Kohms
+	var R_K = $("#IR_K").val(); // Kohms
+	var C_NF = $("#IC_NF").val(); // nF
+	var P1_K = $("#Ipot_value2").val(); // Kohms
+
+	var Rf = RF_K*1000;
+	var R = R_K*1000;
+	var C = C_NF*Math.pow(10,-9);
+	var P1 = P1_K*1000;	    
+    
+	var X = 0 * 1000.0;
+	var scope = {R:R, C:C, Rf:Rf, X:X, P1:P1};
+	return scope;
+}
+
+function getSerie(_scope) {
+    var f = [10,20,30,40,50,60,70,80,90,100,200,300,400,500,600,700,800,900,
+			 1000,2000,3000,4000,5000,6000,7000,8000,9000,
+			 10000,20000,30000,40000,50000,60000,70000,80000,90000,100000];
+    var hdb = [];
+    for (var i=0; i<f.length; i+=1){ 
+        hdb.push([f[i], T(_scope, f[i])]); 
+    }
+	return hdb;
+}
+
+function T(_scope, f) {	
+	var scope = jQuery.extend(true, {}, _scope);
+	scope.w = 2*Math.PI*f;
+	scope.Z = math.eval('R + ( 1 / (1i*w*C))', scope);
+	scope.num = math.eval('X*(Z-Rf) - Z*(P1+Rf)', scope);
+	scope.den = math.eval('X*(Z-Rf) + Rf*(Z+P1)', scope);
+	return 20 * math.log10(math.abs(math.eval('num/den',scope)));
+}
+
+function hzTickFormatter(format, val) { 
+   if(val == 10) return "10Hz";
+   if(val == 100) return "100Hz";
+   if(val == 1000) return "1KHz";
+   if(val == 10000) return "10KHz";
+   if(val == 100000) return "100KHz";
+   return "";
+}
+
+function plot() {
+    $.jqplot._noToImageButton = true;
+ 
+    var plot1 = $.jqplot("plot2", getSeries(), {
+       
+        title: 'Magnitude',
+        grid: {
+            background: 'rgb(57,57,57)',
+            drawBorder: true,
+            shadow: false,
+            gridLineColor: '#666666',
+            gridLineWidth: 1
+        },
+        seriesDefaults: {
+            rendererOptions: {
+                smooth: true,
+            },
+            showMarker: false,
+            lineWidth: 1.5,
+            shadow: false
+        },
+        axesDefaults: {
+            rendererOptions: {
+                baselineWidth: 1.5,
+                baselineColor: '#444444',
+                drawBaseline: false
+            }
+        },
+        axes: {
+            xaxis: {
+                renderer: $.jqplot.LogAxisRenderer,
+                tickRenderer: $.jqplot.CanvasAxisTickRenderer,
+                pad: 0,
+                rendererOptions: {
+                    minorTicks: 9
+                },
+                tickOptions: {
+                    formatter: hzTickFormatter,
+                    showMark: true,
+					angle: -45,
+                    fontSize: '8pt'
+                }
+				
+            },
+            yaxis: {
+				tickRenderer: $.jqplot.CanvasAxisTickRenderer,
+				tickOptions: {
+                    formatString: "%'ddB",
+                    showMark: true,
+					angle: -45,
+                    fontSize: '8pt'
+                }
+            }
+        }
+    });
+}
+
+$(document).ready(function () {
+	plot();     
+});
+
+
+
+///////////////////////////////////////////////////////
+
+/*
+ *
+ * Copyright (c) 2006-2011 Sam Collett (http://www.texotela.co.uk)
+ * Dual licensed under the MIT (http://www.opensource.org/licenses/mit-license.php)
+ * and GPL (http://www.opensource.org/licenses/gpl-license.php) licenses.
+ * 
+ * Version 1.3.1
+ * Demo: http://www.texotela.co.uk/code/jquery/numeric/
+ *
+ */
+(function($) {
+/*
+ * Allows only valid characters to be entered into input boxes.
+ * Note: fixes value when pasting via Ctrl+V, but not when using the mouse to paste
+  *      side-effect: Ctrl+A does not work, though you can still use the mouse to select (or double-click to select all)
+ *
+ * @name     numeric
+ * @param    config      { decimal : "." , negative : true }
+ * @param    callback     A function that runs if the number is not valid (fires onblur)
+ * @author   Sam Collett (http://www.texotela.co.uk)
+ * @example  $(".numeric").numeric();
+ * @example  $(".numeric").numeric(","); // use , as separator
+ * @example  $(".numeric").numeric({ decimal : "," }); // use , as separator
+ * @example  $(".numeric").numeric({ negative : false }); // do not allow negative values
+ * @example  $(".numeric").numeric(null, callback); // use default values, pass on the 'callback' function
+ *
+ */
+$.fn.numeric = function(config, callback)
+{
+	if(typeof config === 'boolean')
+	{
+		config = { decimal: config };
+	}
+	config = config || {};
+	// if config.negative undefined, set to true (default is to allow negative numbers)
+	if(typeof config.negative == "undefined") { config.negative = true; }
+	// set decimal point
+	var decimal = (config.decimal === false) ? "" : config.decimal || ".";
+	// allow negatives
+	var negative = (config.negative === true) ? true : false;
+	// callback function
+	callback = (typeof(callback) == "function" ? callback : function() {});
+	// set data and methods
+	return this.data("numeric.decimal", decimal).data("numeric.negative", negative).data("numeric.callback", callback).keypress($.fn.numeric.keypress).keyup($.fn.numeric.keyup).blur($.fn.numeric.blur);
+};
+
+$.fn.numeric.keypress = function(e)
+{
+	// get decimal character and determine if negatives are allowed
+	var decimal = $.data(this, "numeric.decimal");
+	var negative = $.data(this, "numeric.negative");
+	// get the key that was pressed
+	var key = e.charCode ? e.charCode : e.keyCode ? e.keyCode : 0;
+	// allow enter/return key (only when in an input box)
+	if(key == 13 && this.nodeName.toLowerCase() == "input")
+	{
+		return true;
+	}
+	else if(key == 13)
+	{
+		return false;
+	}
+	var allow = false;
+	// allow Ctrl+A
+	if((e.ctrlKey && key == 97 /* firefox */) || (e.ctrlKey && key == 65) /* opera */) { return true; }
+	// allow Ctrl+X (cut)
+	if((e.ctrlKey && key == 120 /* firefox */) || (e.ctrlKey && key == 88) /* opera */) { return true; }
+	// allow Ctrl+C (copy)
+	if((e.ctrlKey && key == 99 /* firefox */) || (e.ctrlKey && key == 67) /* opera */) { return true; }
+	// allow Ctrl+Z (undo)
+	if((e.ctrlKey && key == 122 /* firefox */) || (e.ctrlKey && key == 90) /* opera */) { return true; }
+	// allow or deny Ctrl+V (paste), Shift+Ins
+	if((e.ctrlKey && key == 118 /* firefox */) || (e.ctrlKey && key == 86) /* opera */ ||
+	  (e.shiftKey && key == 45)) { return true; }
+	// if a number was not pressed
+	if(key < 48 || key > 57)
+	{
+	  var value = $(this).val();
+		/* '-' only allowed at start and if negative numbers allowed */
+		if(value.indexOf("-") !== 0 && negative && key == 45 && (value.length === 0 || parseInt($.fn.getSelectionStart(this), 10) === 0)) { return true; }
+		/* only one decimal separator allowed */
+		if(decimal && key == decimal.charCodeAt(0) && value.indexOf(decimal) != -1)
+		{
+			allow = false;
+		}
+		// check for other keys that have special purposes
+		if(
+			key != 8 /* backspace */ &&
+			key != 9 /* tab */ &&
+			key != 13 /* enter */ &&
+			key != 35 /* end */ &&
+			key != 36 /* home */ &&
+			key != 37 /* left */ &&
+			key != 39 /* right */ &&
+			key != 46 /* del */
+		)
+		{
+			allow = false;
+		}
+		else
+		{
+			// for detecting special keys (listed above)
+			// IE does not support 'charCode' and ignores them in keypress anyway
+			if(typeof e.charCode != "undefined")
+			{
+				// special keys have 'keyCode' and 'which' the same (e.g. backspace)
+				if(e.keyCode == e.which && e.which !== 0)
+				{
+					allow = true;
+					// . and delete share the same code, don't allow . (will be set to true later if it is the decimal point)
+					if(e.which == 46) { allow = false; }
+				}
+				// or keyCode != 0 and 'charCode'/'which' = 0
+				else if(e.keyCode !== 0 && e.charCode === 0 && e.which === 0)
+				{
+					allow = true;
+				}
+			}
+		}
+		// if key pressed is the decimal and it is not already in the field
+		if(decimal && key == decimal.charCodeAt(0))
+		{
+			if(value.indexOf(decimal) == -1)
+			{
+				allow = true;
+			}
+			else
+			{
+				allow = false;
+			}
+		}
+	}
+	else
+	{
+		allow = true;
+	}
+	return allow;
+};
+
+$.fn.numeric.keyup = function(e)
+{
+	var val = $(this).val();
+	if(val && val.length > 0)
+	{
+		// get carat (cursor) position
+		var carat = $.fn.getSelectionStart(this);
+		var selectionEnd = $.fn.getSelectionEnd(this);
+		// get decimal character and determine if negatives are allowed
+		var decimal = $.data(this, "numeric.decimal");
+		var negative = $.data(this, "numeric.negative");
+
+		// prepend a 0 if necessary
+		if(decimal !== "" && decimal !== null)
+		{
+			// find decimal point
+			var dot = val.indexOf(decimal);
+			// if dot at start, add 0 before
+			if(dot === 0)
+			{
+				this.value = "0" + val;
+			}
+			// if dot at position 1, check if there is a - symbol before it
+			if(dot == 1 && val.charAt(0) == "-")
+			{
+				this.value = "-0" + val.substring(1);
+			}
+			val = this.value;
+		}
+
+		// if pasted in, only allow the following characters
+		var validChars = [0,1,2,3,4,5,6,7,8,9,'-',decimal];
+		// get length of the value (to loop through)
+		var length = val.length;
+		// loop backwards (to prevent going out of bounds)
+		for(var i = length - 1; i >= 0; i--)
+		{
+			var ch = val.charAt(i);
+			// remove '-' if it is in the wrong place
+			if(i !== 0 && ch == "-")
+			{
+				val = val.substring(0, i) + val.substring(i + 1);
+			}
+			// remove character if it is at the start, a '-' and negatives aren't allowed
+			else if(i === 0 && !negative && ch == "-")
+			{
+				val = val.substring(1);
+			}
+			var validChar = false;
+			// loop through validChars
+			for(var j = 0; j < validChars.length; j++)
+			{
+				// if it is valid, break out the loop
+				if(ch == validChars[j])
+				{
+					validChar = true;
+					break;
+				}
+			}
+			// if not a valid character, or a space, remove
+			if(!validChar || ch == " ")
+			{
+				val = val.substring(0, i) + val.substring(i + 1);
+			}
+		}
+		// remove extra decimal characters
+		var firstDecimal = val.indexOf(decimal);
+		if(firstDecimal > 0)
+		{
+			for(var k = length - 1; k > firstDecimal; k--)
+			{
+				var chch = val.charAt(k);
+				// remove decimal character
+				if(chch == decimal)
+				{
+					val = val.substring(0, k) + val.substring(k + 1);
+				}
+			}
+		}
+		// set the value and prevent the cursor moving to the end
+		this.value = val;
+		$.fn.setSelection(this, [carat, selectionEnd]);
+	}
+};
+
+$.fn.numeric.blur = function()
+{
+	var decimal = $.data(this, "numeric.decimal");
+	var callback = $.data(this, "numeric.callback");
+	var val = this.value;
+	if(val !== "")
+	{
+		var re = new RegExp("^\\d+$|^\\d*" + decimal + "\\d+$");
+		if(!re.exec(val))
+		{
+			callback.apply(this);
+		}
+	}
+};
+
+$.fn.removeNumeric = function()
+{
+	return this.data("numeric.decimal", null).data("numeric.negative", null).data("numeric.callback", null).unbind("keypress", $.fn.numeric.keypress).unbind("blur", $.fn.numeric.blur);
+};
+
+// Based on code from http://javascript.nwbox.com/cursor_position/ (Diego Perini <dperini@nwbox.com>)
+$.fn.getSelectionStart = function(o)
+{
+	if (o.createTextRange)
+	{
+		var r = document.selection.createRange().duplicate();
+		r.moveEnd('character', o.value.length);
+		if (r.text === '') { return o.value.length; }
+		return o.value.lastIndexOf(r.text);
+	} else { return o.selectionStart; }
+};
+
+// Based on code from http://javascript.nwbox.com/cursor_position/ (Diego Perini <dperini@nwbox.com>)
+$.fn.getSelectionEnd = function(o)
+{
+	if (o.createTextRange) {
+		var r = document.selection.createRange().duplicate()
+		r.moveStart('character', -o.value.length)
+		return r.text.length
+	} else return o.selectionEnd
+}
+
+// set the selection, o is the object (input), p is the position ([start, end] or just start)
+$.fn.setSelection = function(o, p)
+{
+	// if p is number, start and end are the same
+	if(typeof p == "number") { p = [p, p]; }
+	// only set if p is an array of length 2
+	if(p && p.constructor == Array && p.length == 2)
+	{
+		if (o.createTextRange)
+		{
+			var r = o.createTextRange();
+			r.collapse(true);
+			r.moveStart('character', p[0]);
+			r.moveEnd('character', p[1]);
+			r.select();
+		}
+		else if(o.setSelectionRange)
+		{
+			o.focus();
+			o.setSelectionRange(p[0], p[1]);
+		}
+	}
+};
+
+})(jQuery);
+
+
+function round_two_decimal(number) {
+	return Math.round(number*100)/100;
+}
+
+function reset() {
+	$("#component_error").hide();
+	$("#component_error").text('');
+	$("#filter_error").hide();
+	$("#filter_error").text('');
+}
+
+function check() {
+	if($("#Ibass_boost").val()=="" || $("#Itreble_boost").val()=="" || $("#Ipivot_frequency").val()=="" || $("#Ipot_value1").val()=="") {
+		$("#bComponents").prop("disabled", true);
+	} else {
+		$("#bComponents").prop("disabled", false);
+	}
+	
+	if($("#IRF_K").val()=="" || $("#IR_K").val()=="" || $("#IC_NF").val()=="" || $("#Ipot_value2").val()==""){
+		$("#bFilter").prop("disabled", true);
+	} else {
+		$("#bFilter").prop("disabled", false);
+	}
+
+}
+
+function call_components() {
+	reset();
+		
+	var bass_boost_db = $("#Ibass_boost").val();//db
+	var treble_boost_db = $("#Itreble_boost").val(); //db
+	var pivot_frequency = $("#Ipivot_frequency").val(); //Hz
+	var pot_value = $("#Ipot_value1").val(); // Kohm
+	
+	var comp_values = calc_components(bass_boost_db, treble_boost_db, pivot_frequency, pot_value);
+
+	if(comp_values==undefined) {
+		$("#ORF").text('');
+		$("#OR").text('');
+		$("#OC").text('');
+		return;
+	}
+	
+	$("#ORF").text(comp_values[0]);
+	$("#OR").text(comp_values[1]);
+	$("#OC").text(comp_values[2]);
+}
+
+function calc_components(bassboostdb, trebleboostdb, FP, P1_K) {
+	var RF;
+	var R;
+	var C;
+	var res = new Array(3);
+	
+	P1 = P1_K*1000;
+	
+	var ML = Math.pow(10,bassboostdb/20);
+	var MH = Math.pow(10,trebleboostdb/20);
+	if(!(ML - 1 > 0)) {
+		$("#component_error").text("bass boost value not valid");
+		$("#component_error").show();		
+		return;
+	}
+	if(!((MH * ML) - 1 > 0)) {
+		$("#component_error").text("treble boost value not valid");
+		$("#component_error").show();		
+		return;
+	}
+	RF = P1/(ML-1);
+	R = P1/((MH*ML)-1);
+	C = (((ML-1)*Math.sqrt(ML+1)*Math.pow((MH*ML)-1,3/2)) * Math.sqrt((MH-1)/((ML-1)*((MH*ML)-1)))) / (2*Math.PI*ML*P1*FP*(MH-1)*Math.sqrt(MH+1));	
+	
+	var res = new Array(3);
+	res[0] = round_two_decimal(RF / 1000);
+	res[1] = round_two_decimal(R / 1000);
+	res[2] = round_two_decimal(C * 1000000000);
+	return res;
+}
+
+function call_filter() {
+	reset();
+	var RF_K = $("#IRF_K").val(); // Kohms
+	var R_K = $("#IR_K").val(); // Kohms
+	var C_NF = $("#IC_NF").val(); // nF
+	var P1_K = $("#Ipot_value2").val(); // Kohms
+	
+	var filter_values = calc_filter(RF_K, R_K, C_NF, P1_K);
+	
+	if(filter_values==undefined) {
+		$("#Opivot_frequency").text('');
+		$("#Obass_boost").text('');
+		$("#Otreble_boost").text('');
+		return;
+	}
+	
+	$("#Opivot_frequency").text(filter_values[0]);
+	$("#Obass_boost").text(filter_values[1]);
+	$("#Otreble_boost").text(filter_values[2]);
+}
+
+function calc_filter(RF_K, R_K, C_NF, P1_K) {
+	var bass_boost_db;
+	var treble_boost_db;
+	var FP;
+
+	var RF = RF_K*1000;
+	var R = R_K*1000;
+	var C = C_NF*Math.pow(10,-9);
+	var P1 = P1_K*1000;	
+	
+	if(!(RF>R)) {
+		$("#filter_error").text("RF must be greater than R");
+		$("#filter_error").show();
+		return;
+	}
+		
+	FP =  Math.sqrt(P1+(2*RF)) / ( 2*Math.PI*C*Math.sqrt(RF-R)*Math.sqrt((P1*(R+RF))+(2*R*RF)) );
+	var ML = (P1+RF)/RF;
+	var MH = (P1+R)/(R*ML);
+	bass_boost_db = 20*(Math.log(ML)/Math.LN10);
+	treble_boost_db = 20*(Math.log(MH)/Math.LN10);
+	var res = new Array(3);
+	res[0] = round_two_decimal(FP);
+	res[1] = round_two_decimal(bass_boost_db);
+	res[2] = round_two_decimal(treble_boost_db);
+    
+    plot();
+    
+	return res;
+}
+
+
+$(".numeric").numeric();
+	$(".integer").numeric(false, function() { alert("Integers only"); this.value = ""; this.focus(); });
+	$(".positive").numeric({ negative: false }, function() { alert("No negative values"); this.value = ""; this.focus(); });
+	$(".positive-integer").numeric({ decimal: false, negative: false }, function() { alert("Positive integers only"); this.value = ""; this.focus(); });
+	$("#remove").click(
+		function(e)
+		{
+			e.preventDefault();
+			$(".numeric,.integer,.positive").removeNumeric();
+		}
+	);
+	
+	$(".positive").keyup(check);
+	$(".positive").keyup(reset);
+
+</script>
+
+
+
+
+</body>
+</html>
